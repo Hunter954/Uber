@@ -1,14 +1,17 @@
-FROM node:22-alpine
+FROM node:20-alpine
+
 WORKDIR /app
 
 COPY package*.json ./
 COPY server/package*.json ./server/
 COPY client/package*.json ./client/
 
-RUN npm install
+RUN npm install --workspaces --include-workspace-root=false
 
 COPY . .
+
 RUN npm run build
 
-EXPOSE 8080
+EXPOSE 3000
+
 CMD ["npm", "start"]
