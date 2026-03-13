@@ -2,9 +2,12 @@
   "name": "uberzinho-v2",
   "private": true,
   "version": "2.0.0",
-  "workspaces": ["server", "client"],
+  "workspaces": [
+    "server",
+    "client"
+  ],
   "scripts": {
-    "dev": "concurrently "npm run dev -w server" "npm run dev -w client"",
+    "dev": "concurrently \"npm run dev -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w client",
     "start": "npm run start -w server",
     "install:all": "npm install -w server && npm install -w client"
