@@ -6,7 +6,7 @@ COPY package*.json ./
 COPY server/package*.json ./server/
 COPY client/package*.json ./client/
 
-RUN npm install --workspaces --include-workspace-root=false
+RUN npm install --ignore-scripts
 
 COPY . .
 
