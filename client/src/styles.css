@@ -65,3 +65,13 @@ input, select {
   .screen-grid { grid-template-columns: 1.05fr .95fr; align-items: start; }
   .map-card { position: sticky; top: 16px; height: calc(100vh - 32px); }
 }
+
+.compact-btn { padding: 12px 14px; }
+.search-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.search-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.coords-grid input { font-size: 14px; }
+.info-box { background: rgba(59,130,246,.12); color: #bfdbfe; border: 1px solid rgba(59,130,246,.25); border-radius: 14px; padding: 12px; }
+@media (max-width: 640px) {
+  .search-row { grid-template-columns: 1fr; }
+  .search-actions { display: grid; grid-template-columns: 1fr 1fr; }
+}

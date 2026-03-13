@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import MapView from '../components/MapView';
 
 export default function DriverPage({ user, mapCenter, drivers, currentRide, history, refreshMe, refreshCurrentRide, refreshHistory, socketRef }) {
   const [openRides, setOpenRides] = useState([]);
+  const watchIdRef = useRef(null);
 
   async function refreshOpenRides() {
     const data = await api('/api/rides/open');
@@ -12,14 +13,70 @@ export default function DriverPage({ user, mapCenter, drivers, currentRide, hist
 
   useEffect(() => {
     refreshOpenRides();
+    const interval = window.setInterval(() => {
+      refreshOpenRides().catch(() => {});
+    }, 8000);
+
+    return () => window.clearInterval(interval);
   }, []);
 
-  function toggleOnline() {
-    api('/api/driver/status', {
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket) return undefined;
+
+    const syncOpenRides = () => refreshOpenRides().catch(() => {});
+    socket.on('ride:created', syncOpenRides);
+    socket.on('ride:updated', syncOpenRides);
+    socket.on('drivers:updated', syncOpenRides);
+
+    return () => {
+      socket.off('ride:created', syncOpenRides);
+      socket.off('ride:updated', syncOpenRides);
+      socket.off('drivers:updated', syncOpenRides);
+    };
+  }, [socketRef.current]);
+
+  useEffect(() => {
+    if (!user.online || !navigator.geolocation) {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation?.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+      return undefined;
+    }
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        try {
+          await api('/api/driver/location', { method: 'PATCH', body: JSON.stringify({ lat, lng }) });
+          socketRef.current?.emit('driver:location', { lat, lng });
+          refreshMe();
+        } catch {
+          // noop
+        }
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+    );
+
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+    };
+  }, [user.online]);
+
+  async function toggleOnline() {
+    await api('/api/driver/status', {
       method: 'PATCH',
       body: JSON.stringify({ online: !user.online }),
-    }).then(refreshMe);
+    });
     socketRef.current?.emit('driver:online', { online: !user.online });
+    await refreshMe();
+    await refreshOpenRides();
   }
 
   function sendMyLocation() {

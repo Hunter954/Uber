@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import AuthScreen from './components/AuthScreen';
 import Layout from './components/Layout';
 import PassengerPage from './pages/PassengerPage';
@@ -18,6 +18,8 @@ export default function App() {
   const [users, setUsers] = useState([]);
   const [bootLoading, setBootLoading] = useState(true);
 
+  const currentRideId = useMemo(() => currentRide?.id || null, [currentRide?.id]);
+
   const socketRef = useSocket(token, {
     bootstrap: (payload) => {
       if (payload?.mapCenter) setMapCenter(payload.mapCenter);
@@ -27,7 +29,7 @@ export default function App() {
     'ride:updated': (payload) => {
       setCurrentRide((old) => (old?.id === payload.id ? payload : old));
       refreshHistory();
-      refreshCurrentRide();
+      if (!currentRideId || payload.id === currentRideId) refreshCurrentRide();
       if (user?.role === 'admin') refreshAdmin();
     },
     'ride:created': () => {
@@ -80,6 +82,12 @@ export default function App() {
       })
       .catch(() => logout());
   }, [token]);
+
+
+  useEffect(() => {
+    if (!currentRideId || !socketRef.current) return;
+    socketRef.current.emit('ride:watch', { rideId: currentRideId });
+  }, [currentRideId, socketRef.current]);
 
   async function login(credentials) {
     const data = await api('/api/auth/login', { method: 'POST', body: JSON.stringify(credentials) });

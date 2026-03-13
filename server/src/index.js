@@ -84,6 +84,20 @@ async function broadcastDrivers() {
   io.emit('drivers:updated', await getOnlineDrivers());
 }
 
+async function broadcastDriverActiveRide(userId) {
+  const result = await query(
+    `SELECT r.id
+       FROM rides r
+       JOIN drivers d ON d.id = r.driver_id
+      WHERE d.user_id = $1 AND r.status IN ('accepted', 'arrived', 'in_progress')
+      ORDER BY r.updated_at DESC
+      LIMIT 1`,
+    [userId]
+  );
+
+  if (result.rowCount) await broadcastRide(result.rows[0].id);
+}
+
 app.get('/api/health', async (_req, res) => {
   res.json({ ok: true, name: process.env.APP_NAME || 'Uberzinho V2', mapCenter });
 });
@@ -179,6 +193,7 @@ app.patch('/api/driver/location', authRequired, roleRequired('driver'), async (r
     [Number(lat), Number(lng), req.auth.sub]
   );
   await broadcastDrivers();
+  await broadcastDriverActiveRide(req.auth.sub);
   res.json({ ok: true });
 });
 
@@ -432,6 +447,7 @@ io.on('connection', async (socket) => {
       [Number(lat), Number(lng), socket.user.sub]
     );
     await broadcastDrivers();
+    await broadcastDriverActiveRide(socket.user.sub);
   });
 
   socket.on('driver:online', async ({ online }) => {
@@ -447,6 +463,14 @@ io.on('connection', async (socket) => {
 
   socket.on('disconnect', async () => {
     removeLiveSocket(socket.id);
+    if (socket.user.role === 'driver') {
+      await query(
+        `UPDATE drivers SET online = false, last_seen_at = NOW(), updated_at = NOW() WHERE user_id = $1`,
+        [socket.user.sub]
+      );
+      await broadcastDrivers();
+      await broadcastDriverActiveRide(socket.user.sub);
+    }
   });
 });
 
